@@ -100,39 +100,45 @@ class CodeIngestionEngine:
         return code_files
     
     def extract_functions_fallback(self, content: str, language: str) -> List[Dict[str, Any]]:
-        """Extract functions and classes using regex patterns when Tree-sitter is unavailable."""
+        """Extract functions and classes using Python's AST module for reliability."""
         functions = []
         lines = content.split('\n')
         
         if language == 'python':
-            import re
-            
-            func_pattern = re.compile(r'^(\s*)(def|class)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(.*?\):')
-            
-            for i, line in enumerate(lines):
-                match = func_pattern.match(line)
-                if match:
-                    indent_level = len(match.group(1))
-                    func_type = match.group(2)
-                    func_name = match.group(3)
+            import ast
+            try:
+                tree = ast.parse(content)
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                        start_line = node.lineno
+                        # Get the full source of the node
+                        end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line
+                        source_lines = content.splitlines()[start_line-1:end_line]
+                        
+                        functions.append({
+                            'name': node.name,
+                            'type': 'function' if isinstance(node, ast.FunctionDef) else 'class',
+                            'content': '\n'.join(source_lines),
+                            'start_line': start_line,
+                            'end_line': end_line,
+                            'line_range': f"{start_line}-{end_line}"
+                        })
+            except SyntaxError:
+                # Fallback to chunking if AST parsing fails
+                chunk_size = 50
+                for i in range(0, len(lines), chunk_size):
+                    chunk_lines = lines[i:i + chunk_size]
+                    chunk_content = '\n'.join(chunk_lines)
                     
-                    end_line = len(lines) - 1
-                    for j in range(i + 1, len(lines)):
-                        if lines[j].strip() and not lines[j].startswith(' ' * (indent_level + 1)):
-                            if lines[j].startswith(' ' * indent_level) and lines[j].strip():
-                                end_line = j - 1
-                                break
-                    
-                    func_content = '\n'.join(lines[i:end_line + 1])
-                    
-                    functions.append({
-                        'name': func_name,
-                        'type': func_type,
-                        'content': func_content,
-                        'start_line': i + 1,
-                        'end_line': end_line + 1,
-                        'line_range': f"{i + 1}-{end_line + 1}"
-                    })
+                    if chunk_content.strip():
+                        functions.append({
+                            'name': f'chunk_{i//chunk_size + 1}',
+                            'type': 'code_chunk',
+                            'content': chunk_content,
+                            'start_line': i + 1,
+                            'end_line': min(i + chunk_size, len(lines)),
+                            'line_range': f"{i + 1}-{min(i + chunk_size, len(lines))}"
+                        })
         
         elif language in ['javascript', 'typescript']:
             import re
