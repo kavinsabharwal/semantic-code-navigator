@@ -1,8 +1,8 @@
 """Configuration management for the Semantic Code Navigator."""
 
 import os
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,11 +11,11 @@ load_dotenv()
 @dataclass
 class MindsDBConfig:
     """MindsDB connection configuration."""
-    host: str = os.getenv("MINDSDB_HOST", "127.0.0.1")
-    port: int = int(os.getenv("MINDSDB_PORT", "47334"))
-    user: str = os.getenv("MINDSDB_USER", "")
-    password: str = os.getenv("MINDSDB_PASSWORD", "")
-    database: str = os.getenv("MINDSDB_DATABASE", "mindsdb")
+    host: str = field(default_factory=lambda: os.getenv("MINDSDB_HOST", "127.0.0.1"))
+    port: int = field(default_factory=lambda: int(os.getenv("MINDSDB_PORT", "47334")))
+    user: str = field(default_factory=lambda: os.getenv("MINDSDB_USER", ""))
+    password: str = field(default_factory=lambda: os.getenv("MINDSDB_PASSWORD", ""))
+    database: str = field(default_factory=lambda: os.getenv("MINDSDB_DATABASE", "mindsdb"))
     
     @property
     def connection_url(self) -> str:
@@ -31,12 +31,15 @@ class MindsDBConfig:
 @dataclass
 class KnowledgeBaseConfig:
     """Knowledge Base configuration."""
-    name: str = os.getenv("KB_NAME", "codebase_kb")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
-    reranking_model: str = os.getenv("RERANKING_MODEL", "gpt-3.5-turbo")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    metadata_columns: list = None
-    content_columns: list = None
+    name: str = field(default_factory=lambda: os.getenv("KB_NAME", "codebase_kb"))
+    embedding_model: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"))
+    reranking_model: str = field(default_factory=lambda: os.getenv("RERANKING_MODEL", "gpt-3.5-turbo"))
+    openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    metadata_columns: List[str] = field(default_factory=lambda: [
+        'filepath', 'language', 'function_name', 'repo', 
+        'last_modified', 'author', 'line_range'
+    ])
+    content_columns: List[str] = field(default_factory=lambda: ['code_chunk'])
     id_column: str = "chunk_id"
     
     def __post_init__(self):
@@ -86,20 +89,25 @@ class KnowledgeBaseConfig:
 @dataclass
 class StressTestConfig:
     """Stress testing configuration."""
-    max_concurrent_queries: int = int(os.getenv("MAX_CONCURRENT_QUERIES", "100"))
-    stress_test_duration: int = int(os.getenv("STRESS_TEST_DURATION", "300"))
-    batch_size: int = int(os.getenv("BATCH_SIZE", "500"))
-    threads: int = int(os.getenv("THREADS", "10"))
+    max_concurrent_queries: int = field(default_factory=lambda: int(os.getenv("MAX_CONCURRENT_QUERIES", "100")))
+    stress_test_duration: int = field(default_factory=lambda: int(os.getenv("STRESS_TEST_DURATION", "300")))
+    batch_size: int = field(default_factory=lambda: int(os.getenv("BATCH_SIZE", "500")))
+    threads: int = field(default_factory=lambda: int(os.getenv("THREADS", "10")))
 
 
 @dataclass
 class AppConfig:
     """Main application configuration."""
-    mindsdb: MindsDBConfig
-    kb: KnowledgeBaseConfig
-    stress_test: StressTestConfig
+    mindsdb: MindsDBConfig = field(default_factory=MindsDBConfig)
+    kb: KnowledgeBaseConfig = field(default_factory=KnowledgeBaseConfig)
+    stress_test: StressTestConfig = field(default_factory=StressTestConfig)
     
     def __init__(self):
+        self.load_from_env()
+    
+    def load_from_env(self):
+        """Load configuration from environment variables."""
+        load_dotenv()
         self.mindsdb = MindsDBConfig()
         self.kb = KnowledgeBaseConfig()
         self.stress_test = StressTestConfig()
