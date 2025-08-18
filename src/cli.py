@@ -8,12 +8,13 @@ from rich.panel import Panel
 from typing import Optional, Dict, Any
 import json
 import sys
+import os
 
 from .config import config
 from .mindsdb_client import MindsDBClient
 from .agents import AgentManager, CodeReviewAgent, ArchitectureDiscoveryAgent, SecurityAuditAgent, AGENT_TEMPLATES
 
-console = Console()
+console = Console(markup=False) if "CI" in os.environ else Console()
 
 
 @click.group()
