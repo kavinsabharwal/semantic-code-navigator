@@ -52,6 +52,11 @@ class TestCLIWorkflow(unittest.TestCase):
         """Set up for each test case."""
         if not self._mindsdb_up:
             self.skipTest("MindsDB container is not running, skipping integration test.")
+            
+        # Skip the test if the API key is not available as an environment variable
+        self.api_key = os.getenv("TEST_OPENAI_API_KEY")
+        if not self.api_key:
+            self.skipTest("TEST_OPENAI_API_KEY environment variable not set.")
 
         self.runner = CliRunner()
         self.repo_dir = tempfile.mkdtemp(prefix="test_repo_")
@@ -66,7 +71,7 @@ class TestCLIWorkflow(unittest.TestCase):
         
         # Environment for the test run
         self.env = {
-            "OPENAI_API_KEY": "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",
+            "OPENAI_API_KEY": self.api_key,
             "CI": "true"  # Ensure plain text output from `rich`
         }
 
