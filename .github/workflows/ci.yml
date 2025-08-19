@@ -1,0 +1,54 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run unit tests with coverage
+      run: |
+        coverage run -m unittest discover tests/unit
+        coverage report
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: .coverage
+
+    # The integration test is included but marked with 'continue-on-error'
+    # because it requires a valid OpenAI API key with credits to pass.
+    # This step demonstrates the full pipeline, even if it's expected to fail.
+    - name: Run integration tests
+      id: integration-test
+      continue-on-error: true
+      run: |
+        # Set up Docker
+        docker-compose up -d
+        echo "Waiting for MindsDB to start..."
+        sleep 45
+        
+        # Run the tests
+        python3 -m unittest discover tests/integration
+
+    - name: Check integration test status
+      if: steps.integration-test.outcome == 'failure'
+      run: echo "Integration test failed as expected (likely due to missing OpenAI credits)."
